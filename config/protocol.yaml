@@ -1,0 +1,54 @@
+# 协议常量：泵站流量检测系统 Modbus 点表协议 1.02
+unit_id: 1
+block_start_mw: 1000        # 现场可替换
+reg_count: 36               # 从站寄存器块长度
+read_count: 35              # 第三方一次批量读取的寄存器数
+
+# 无效浮点编码：quiet NaN，现场可替换
+invalid_float: .nan
+
+# 偏移表（表内偏移，单位：寄存器）
+offsets:
+  instantInFlow:              0
+  totalInFlow:                2
+  outInstantFlow_1:           4
+  outInstantFlow_2:           6
+  outInstantFlow_3:           8
+  outInstantFlow_4:          10
+  outTotalFlow_1:            12
+  outTotalFlow_2:            14
+  outTotalFlow_3:            16
+  outTotalFlow_4:            18
+  instantReturnFlow:         20
+  totalReturnFlow:           22
+  pumpStationInstantTotalFlow: 24
+  pumpStationDayTotalFlow:   26
+  pumpStationMonthTotalFlow: 28
+  pumpStationYearTotalFlow:  30
+  lowFlowAlarm:              32
+  highFlowAlarm:             33
+  writeCounter:              34
+
+# 分类
+float_fields:
+  - instantInFlow
+  - totalInFlow
+  - outInstantFlow_1
+  - outInstantFlow_2
+  - outInstantFlow_3
+  - outInstantFlow_4
+  - outTotalFlow_1
+  - outTotalFlow_2
+  - outTotalFlow_3
+  - outTotalFlow_4
+  - instantReturnFlow
+  - totalReturnFlow
+  - pumpStationInstantTotalFlow
+  - pumpStationDayTotalFlow
+  - pumpStationMonthTotalFlow
+  - pumpStationYearTotalFlow
+
+u16_fields:
+  - lowFlowAlarm
+  - highFlowAlarm
+  - writeCounter

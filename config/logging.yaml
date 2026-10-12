@@ -1,0 +1,52 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  standard:
+    format: "%(asctime)s [%(levelname)-7s] [%(name)s:%(lineno)d] %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+handlers:
+  # ---- 控制台：主从共用一个 ----
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: standard
+    stream: ext://sys.stdout
+
+  # ---- 从站专属文件（相对路径，基于进程 CWD） ----
+  slave_file:
+    class: logging.handlers.RotatingFileHandler
+    level: INFO
+    formatter: standard
+    filename: logs/slave.log
+    maxBytes: 5242880          # 5 MB
+    backupCount: 3
+    encoding: utf-8
+
+  # ---- 主站专属文件（相对路径，基于进程 CWD） ----
+  master_file:
+    class: logging.handlers.RotatingFileHandler
+    level: INFO
+    formatter: standard
+    filename: logs/master.log
+    maxBytes: 5242880          # 5 MB
+    backupCount: 3
+    encoding: utf-8
+
+loggers:
+  # slave.* （含 slave.generator、slave.writer）都命中此配置
+  slave:
+    level: INFO
+    handlers: [console, slave_file]
+    propagate: false
+
+  # master.* （含 master.client）都命中此配置
+  master:
+    level: INFO
+    handlers: [console, master_file]
+    propagate: false
+
+root:
+  level: WARNING
+  handlers: [console]

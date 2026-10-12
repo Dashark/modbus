@@ -1,0 +1,55 @@
+# 从站运行参数
+write_period: 1.0           # 写入周期（秒）
+
+# ---- 随机模式参数 ----
+random:
+  invalid_prob: 0.02        # 每个浮点测点本轮生成 NaN 的概率
+  alarm_prob: 0.05          # 告警位触发为 1 的概率
+  drift_amp: 2.0            # 瞬时量漂移幅度
+  total_increment_max: 1.0  # 累计量每轮最大增量
+
+# ---- 覆盖模式参数 ----
+# coverage_mode=true 时按 sequence 顺序轮转注入故障
+coverage_mode: false
+coverage_sequence:
+  - {kind: single_nan, target: instantInFlow}
+  - {kind: single_nan, target: totalInFlow}
+  - {kind: single_nan, target: outInstantFlow_1}
+  - {kind: single_nan, target: outInstantFlow_2}
+  - {kind: single_nan, target: outInstantFlow_3}
+  - {kind: single_nan, target: outInstantFlow_4}
+  - {kind: single_nan, target: outTotalFlow_1}
+  - {kind: single_nan, target: outTotalFlow_2}
+  - {kind: single_nan, target: outTotalFlow_3}
+  - {kind: single_nan, target: outTotalFlow_4}
+  - {kind: single_nan, target: instantReturnFlow}
+  - {kind: single_nan, target: totalReturnFlow}
+  - {kind: single_nan, target: pumpStationInstantTotalFlow}
+  - {kind: single_nan, target: pumpStationDayTotalFlow}
+  - {kind: single_nan, target: pumpStationMonthTotalFlow}
+  - {kind: single_nan, target: pumpStationYearTotalFlow}
+  - {kind: multi_nan, targets: [instantInFlow, outTotalFlow_2]}
+  - {kind: all_nan}
+  - {kind: alarm_low}
+  - {kind: alarm_high}
+  - {kind: alarm_both}
+  - {kind: normal}
+
+# ---- 基准值（模拟真实工艺量级） ----
+base_values:
+  instantInFlow: 125.0
+  totalInFlow: 123456.0
+  outInstantFlow_1: 30.0
+  outInstantFlow_2: 30.0
+  outInstantFlow_3: 30.0
+  outInstantFlow_4: 30.0
+  outTotalFlow_1: 10000.0
+  outTotalFlow_2: 10000.0
+  outTotalFlow_3: 10000.0
+  outTotalFlow_4: 10000.0
+  instantReturnFlow: 5.0
+  totalReturnFlow: 5000.0
+  pumpStationInstantTotalFlow: 120.0
+  pumpStationDayTotalFlow: 2880.0
+  pumpStationMonthTotalFlow: 86400.0
+  pumpStationYearTotalFlow: 1051200.0

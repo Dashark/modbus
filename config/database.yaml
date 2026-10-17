@@ -30,6 +30,10 @@ query: |
     q_in_raw,
     v_in_total,
     outlet_a, outlet_b, outlet_c, outlet_d,
+    (metrics->>'ID3-a-all')::float8 AS v_out_a,
+    (metrics->>'ID3-b-all')::float8 AS v_out_b,
+    (metrics->>'ID3-c-all')::float8 AS v_out_c,
+    (metrics->>'ID3-d-all')::float8 AS v_out_d,
     v_out_total,
     q_return,
     (metrics->>'ID4-b')::float8 AS v_return_total,
@@ -41,7 +45,7 @@ query: |
   WHERE pump_room_id = %s;
 
 # SQL 列 -> 点表字段映射
-# 值是点表字段名；未列出的点表字段按 "default_for_missing" 处理
+# 注意：v_out_total 是 4 个出水口累计之和，点表无对应字段，故意不映射
 column_mapping:
   q_in_raw:        instantInFlow
   v_in_total:      totalInFlow
@@ -49,8 +53,10 @@ column_mapping:
   outlet_b:        outInstantFlow_2
   outlet_c:        outInstantFlow_3
   outlet_d:        outInstantFlow_4
-  v_out_total:     outTotalFlow_1
-  # outTotalFlow_2 / 3 / 4 未提供，走 default_for_missing
+  v_out_a:         outTotalFlow_1
+  v_out_b:         outTotalFlow_2
+  v_out_c:         outTotalFlow_3
+  v_out_d:         outTotalFlow_4
   q_return:        instantReturnFlow
   v_return_total:  totalReturnFlow
   q_total_out:     pumpStationInstantTotalFlow
@@ -60,13 +66,23 @@ column_mapping:
   flag_low_flow:   lowFlowAlarm
   flag_high_flow:  highFlowAlarm
 
-# 未在 column_mapping 中出现的浮点字段，用此值填充
-# 可选：0.0 / "invalid"（无效编码 NaN）
+# 仅用于日志/诊断的列（不写入寄存器）
+diagnostic_columns:
+  - calc_time
+  - calc_status
+  - v_out_total
+
+# 未映射浮点字段的默认值：正常路径下不会触发
+# 可选：0.0 / "invalid"
 default_for_missing: invalid
 
-# calc_status 判定：不等于此值视为计算异常，所有浮点写无效编码
-# 设为 null 表示不检查
+# calc_status 判定：不等于此值视为计算异常
 valid_calc_status: 1
 
-# 布尔告警字段转 U16
+# 布尔告警转 U16
 bool_to_u16: true
+
+# 一致性校验：|v_out_total - (v_out_a+v_out_b+v_out_c+v_out_d)| 超过阈值时告警
+consistency_check:
+  enabled: true
+  tolerance: 0.01           # 允许的绝对误差（m³）

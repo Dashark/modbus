@@ -2,7 +2,6 @@
 数据库数据源：从 PostgreSQL / TimescaleDB 读取 flow_calc_latest 最新一行，
 映射为点表字典。
 """
-import time
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
@@ -27,9 +26,9 @@ INVALID_FLOAT = P.INVALID_FLOAT
 class DatabaseSource(DataSource):
     """
     从数据库读取最新流量计算结果。
-    - 使用连接池，避免每轮建连
+    - 连接池复用连接
     - 查询失败/超时/数据过期/calc_status 异常 -> 返回全无效编码
-    - 记录数据库相关统计
+    - v_out_total 一致性校验（仅告警，不阻断写入）
     """
 
     def __init__(self, dsn: Optional[str] = None):
@@ -44,8 +43,11 @@ class DatabaseSource(DataSource):
             "empty": 0,
             "stale": 0,
             "bad_status": 0,
+            "consistency_mismatch": 0,
             "last_calc_time": None,
         }
+        # 诊断列集合（不参与寄存器映射）
+        self._diag_cols = set(getattr(D, "diagnostic_columns", []) or [])
 
     # ---------- DSN ----------
     def _build_dsn(self) -> str:
@@ -66,8 +68,7 @@ class DatabaseSource(DataSource):
             open=True,
             timeout=D.connect_timeout,
         )
-        log.info("数据库连接池已建立: %s:%s/%s",
-                 D.host, D.port, D.dbname)
+        log.info("数据库连接池已建立: %s:%s/%s", D.host, D.port, D.dbname)
 
     def close(self):
         if self.pool is not None:
@@ -100,7 +101,7 @@ class DatabaseSource(DataSource):
         """SQL 行 -> 点表字典"""
         data: Dict[str, Any] = {}
 
-        # 1) 根据 column_mapping 填充
+        # 1) 按 column_mapping 填充
         for col, field in D.column_mapping.items():
             if col not in row:
                 continue
@@ -112,7 +113,7 @@ class DatabaseSource(DataSource):
             else:
                 data[field] = float(val) if val is not None else INVALID_FLOAT
 
-        # 2) 未映射的浮点字段填默认值
+        # 2) 未映射浮点字段兜底（正常路径不会触发）
         for field in P.FLOAT_FIELDS:
             if field not in data:
                 if D.default_for_missing == "invalid":
@@ -120,7 +121,7 @@ class DatabaseSource(DataSource):
                 else:
                     data[field] = float(D.default_for_missing)
 
-        # 3) 未映射的 U16 字段（除 writeCounter）填 0
+        # 3) 未映射 U16 字段（除 writeCounter）填 0
         for field in P.U16_FIELDS:
             if field == "writeCounter":
                 continue
@@ -130,7 +131,41 @@ class DatabaseSource(DataSource):
         data["writeCounter"] = counter & 0xFFFF
         return data
 
-    # ---------- 数据有效性 ----------
+    # ---------- 一致性校验 ----------
+    def _check_consistency(self, row: Dict[str, Any]):
+        """
+        校验 v_out_total ≈ v_out_a + v_out_b + v_out_c + v_out_d。
+        仅告警，不影响数据写入。
+        """
+        cfg = getattr(D, "consistency_check", None) or {}
+        if not cfg.get("enabled", False):
+            return
+        try:
+            total = row.get("v_out_total")
+            parts = [row.get(k) for k in ("v_out_a", "v_out_b", "v_out_c", "v_out_d")]
+            if total is None or any(p is None for p in parts):
+                return
+            s = sum(float(p) for p in parts)
+            diff = abs(float(total) - s)
+            tol = float(cfg.get("tolerance", 0.01))
+            if diff > tol:
+                self.stats["consistency_mismatch"] += 1
+                log.warning(
+                    "v_out_total 一致性异常: total=%.4f sum(a+b+c+d)=%.4f diff=%.4f > tol=%.4f",
+                    float(total), s, diff, tol,
+                )
+        except Exception as e:  # noqa
+            log.error("一致性校验异常: %s", e)
+
+    # ---------- 诊断日志 ----------
+    def _log_diagnostics(self, row: Dict[str, Any]):
+        if not self._diag_cols:
+            return
+        diag = {k: row.get(k) for k in self._diag_cols if k in row}
+        if diag:
+            log.info("诊断列: %s", diag)
+
+    # ---------- 有效性 ----------
     def _check_status(self, row: Dict[str, Any]) -> bool:
         if D.valid_calc_status is None:
             return True
@@ -172,6 +207,9 @@ class DatabaseSource(DataSource):
             log.warning("数据库无 pump_room_id=%s 的数据，写无效编码",
                         D.pump_room_id)
             return self._row_to_data({}, counter)
+
+        self._log_diagnostics(row)
+        self._check_consistency(row)
 
         if not self._check_status(row) or not self._check_freshness(row):
             return self._row_to_data({}, counter)

@@ -1,0 +1,72 @@
+# PostgreSQL / TimescaleDB 连接与查询配置
+enabled: true                   # true=从数据库读；false=回退到生成器
+
+# 连接参数（生产环境建议用环境变量覆盖，见 settings.py）
+host: 127.0.0.1
+port: 5432
+dbname: rain_pump_station
+user: postgres
+password: ""                    # 建议留空，用环境变量 PUMP_DB_PASSWORD
+connect_timeout: 5
+
+# 连接池
+pool_min: 1
+pool_max: 4
+
+# 查询超时（秒）
+query_timeout: 3
+
+# 泵房编号（SQL 中的 pump_room_id）
+pump_room_id: "S0004-P01"
+
+# 数据新鲜度阈值（秒）：calc_time 与当前时间差超过此值视为数据过期
+stale_threshold_sec: 30
+
+# SQL：使用参数化查询，%s 占位
+query: |
+  SELECT
+    calc_time,
+    calc_status,
+    q_in_raw,
+    v_in_total,
+    outlet_a, outlet_b, outlet_c, outlet_d,
+    v_out_total,
+    q_return,
+    (metrics->>'ID4-b')::float8 AS v_return_total,
+    q_total_out,
+    v_day, v_month, v_year,
+    flag_low_flow,
+    flag_high_flow
+  FROM flow_calc_latest
+  WHERE pump_room_id = %s;
+
+# SQL 列 -> 点表字段映射
+# 值是点表字段名；未列出的点表字段按 "default_for_missing" 处理
+column_mapping:
+  q_in_raw:        instantInFlow
+  v_in_total:      totalInFlow
+  outlet_a:        outInstantFlow_1
+  outlet_b:        outInstantFlow_2
+  outlet_c:        outInstantFlow_3
+  outlet_d:        outInstantFlow_4
+  v_out_total:     outTotalFlow_1
+  # outTotalFlow_2 / 3 / 4 未提供，走 default_for_missing
+  q_return:        instantReturnFlow
+  v_return_total:  totalReturnFlow
+  q_total_out:     pumpStationInstantTotalFlow
+  v_day:           pumpStationDayTotalFlow
+  v_month:         pumpStationMonthTotalFlow
+  v_year:          pumpStationYearTotalFlow
+  flag_low_flow:   lowFlowAlarm
+  flag_high_flow:  highFlowAlarm
+
+# 未在 column_mapping 中出现的浮点字段，用此值填充
+# 可选：0.0 / "invalid"（无效编码 NaN）
+default_for_missing: invalid
+
+# calc_status 判定：不等于此值视为计算异常，所有浮点写无效编码
+# 设为 null 表示不检查
+valid_calc_status: 1
+
+# 布尔告警字段转 U16
+bool_to_u16: true

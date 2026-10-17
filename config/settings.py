@@ -32,27 +32,24 @@ class Settings:
         self._raw_protocol = _load_yaml(CONFIG_DIR / "protocol.yaml")
         self._raw_slave = _load_yaml(CONFIG_DIR / "slave.yaml")
         self._raw_logging = _load_yaml(CONFIG_DIR / "logging.yaml")
+        self._raw_database = _load_yaml(CONFIG_DIR / "database.yaml")
 
-    # ---------- 协议 ----------
+    # ---- 协议 ----
     @property
     def protocol(self) -> SimpleNamespace:
         r = self._raw_protocol
-        invalid = r["invalid_float"]
-        # 兼容 YAML 把 nan / inf 解析成字符串的情况
-        if isinstance(invalid, str):
-            invalid = float(invalid)
         return SimpleNamespace(
             UNIT_ID=r["unit_id"],
             BLOCK_START_MW=r["block_start_mw"],
             REG_COUNT=r["reg_count"],
             READ_COUNT=r["read_count"],
-            INVALID_FLOAT=invalid,
+            INVALID_FLOAT=r["invalid_float"],
             OFFSET=r["offsets"],
             FLOAT_FIELDS=r["float_fields"],
             U16_FIELDS=r["u16_fields"],
         )
 
-    # ---------- 从站 ----------
+    # ---- 从站 ----
     @property
     def slave(self) -> SimpleNamespace:
         r = self._raw_slave
@@ -64,7 +61,24 @@ class Settings:
             BASE_VALUES=r["base_values"],
         )
 
-    # ---------- 日志 ----------
+    # ---- 数据库 ----
+    @property
+    def database(self) -> SimpleNamespace:
+        r = dict(self._raw_database)   # 浅拷贝，避免污染原始配置
+        # 环境变量覆盖敏感/环境相关参数
+        if os.getenv("PUMP_DB_HOST"):
+            r["host"] = os.environ["PUMP_DB_HOST"]
+        if os.getenv("PUMP_DB_PORT"):
+            r["port"] = int(os.environ["PUMP_DB_PORT"])
+        if os.getenv("PUMP_DB_NAME"):
+            r["dbname"] = os.environ["PUMP_DB_NAME"]
+        if os.getenv("PUMP_DB_USER"):
+            r["user"] = os.environ["PUMP_DB_USER"]
+        if os.getenv("PUMP_DB_PASSWORD"):
+            r["password"] = os.environ["PUMP_DB_PASSWORD"]
+        return SimpleNamespace(**r)
+
+    # ---- 日志 ----
     def setup_logging(self):
         """
         直接加载 logging.yaml，不做路径改写。

@@ -24,12 +24,12 @@ RUN pip install -r requirements.txt
 # 拷贝应用代码
 COPY . .
 
-# 非 root 用户运行（502 端口需 CAP_NET_BIND_SERVICE，见 compose）
-RUN useradd -m -u 1000 appuser \
-    && mkdir -p /app/logs \
-    && chown -R appuser:appuser /app
-USER appuser
+# 修正 entrypoint.sh 的 CRLF 并赋可执行权限
+RUN sed -i 's/\r$//' /app/docker/entrypoint.sh \
+    && chmod +x /app/docker/entrypoint.sh
 
-# 默认启动从站（可被 compose command 覆盖）
+# 不创建非 root 用户，容器默认以 root 运行
+# root 可直接绑定 502，无需额外 cap（但保留 cap_add 也无害）
+
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
 CMD ["slave"]

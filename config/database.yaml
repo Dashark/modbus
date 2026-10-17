@@ -1,28 +1,21 @@
 # PostgreSQL / TimescaleDB 连接与查询配置
 enabled: true                   # true=从数据库读；false=回退到生成器
 
-# 连接参数（生产环境建议用环境变量覆盖，见 settings.py）
-host: 127.0.0.1
+# 默认值；容器内会被 PUMP_DB_* 环境变量覆盖
+host: host.docker.internal
 port: 5432
 dbname: rain_pump_station
 user: postgres
-password: ""                    # 建议留空，用环境变量 PUMP_DB_PASSWORD
+password: ""
 connect_timeout: 5
 
-# 连接池
 pool_min: 1
 pool_max: 4
-
-# 查询超时（秒）
 query_timeout: 3
 
-# 泵房编号（SQL 中的 pump_room_id）
 pump_room_id: "S0004-P01"
-
-# 数据新鲜度阈值（秒）：calc_time 与当前时间差超过此值视为数据过期
 stale_threshold_sec: 30
 
-# SQL：使用参数化查询，%s 占位
 query: |
   SELECT
     calc_time,
@@ -44,8 +37,6 @@ query: |
   FROM flow_calc_latest
   WHERE pump_room_id = %s;
 
-# SQL 列 -> 点表字段映射
-# 注意：v_out_total 是 4 个出水口累计之和，点表无对应字段，故意不映射
 column_mapping:
   q_in_raw:        instantInFlow
   v_in_total:      totalInFlow
@@ -66,23 +57,15 @@ column_mapping:
   flag_low_flow:   lowFlowAlarm
   flag_high_flow:  highFlowAlarm
 
-# 仅用于日志/诊断的列（不写入寄存器）
 diagnostic_columns:
   - calc_time
   - calc_status
   - v_out_total
 
-# 未映射浮点字段的默认值：正常路径下不会触发
-# 可选：0.0 / "invalid"
 default_for_missing: invalid
-
-# calc_status 判定：不等于此值视为计算异常
 valid_calc_status: 1
-
-# 布尔告警转 U16
 bool_to_u16: true
 
-# 一致性校验：|v_out_total - (v_out_a+v_out_b+v_out_c+v_out_d)| 超过阈值时告警
 consistency_check:
   enabled: true
-  tolerance: 0.01           # 允许的绝对误差（m³）
+  tolerance: 0.01

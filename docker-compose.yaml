@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  pump-slave:
+    build: .
+    image: pump-modbus:latest
+    container_name: pump-slave
+    restart: unless-stopped
+    command: ["slave"]
+    environment:
+      # 数据库（覆盖 config/database.yaml 中的默认值）
+      PUMP_DB_HOST: ${PUMP_DB_HOST:-host.docker.internal}
+      PUMP_DB_PORT: ${PUMP_DB_PORT:-5432}
+      PUMP_DB_NAME: ${PUMP_DB_NAME:-rain_pump_station}
+      PUMP_DB_USER: ${PUMP_DB_USER:-postgres}
+      PUMP_DB_PASSWORD: ${PUMP_DB_PASSWORD:-}
+      # 从站参数
+      SOURCE_KIND: ${SOURCE_KIND:-db}      # db / generator
+      MODBUS_PORT: ${MODBUS_PORT:-502}
+      # 健康检查
+      HEALTHCHECK_HOST: 127.0.0.1
+      MODBUS_UNIT: "1"
+    ports:
+      - "${MODBUS_PORT:-502}:502"
+    volumes:
+      - ./logs:/app/logs
+    # 502 < 1024，需要绑定低端口能力（Linux 容器在 Windows Docker Desktop 下同样生效）
+    cap_add:
+      - NET_BIND_SERVICE
+    healthcheck:
+      test: ["CMD", "python", "/app/docker/healthcheck.py"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # Windows Docker Desktop 下访问宿主机 PostgreSQL：
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  pump-master:
+    image: pump-modbus:latest
+    container_name: pump-master
+    restart: unless-stopped
+    command: ["master"]
+    environment:
+      PLC_HOST: ${PLC_HOST:-pump-slave}
+      MODBUS_PORT: "502"
+    depends_on:
+      pump-slave:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    profiles:
+      - master     # 默认不启动，需要时 docker compose --profile master up

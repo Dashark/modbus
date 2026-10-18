@@ -16,6 +16,18 @@ query_timeout: 3
 pump_room_id: "S0004-P01"
 stale_threshold_sec: 30
 
+# calc_status 判定：命中列表视为有效，否则所有浮点写无效编码
+# 枚举值：OK / DEGRADED / STOPPED / ERROR
+valid_calc_status:
+  - OK
+  - DEGRADED
+
+# calc_time 时区（数据库列存储的本地时区）
+calc_timezone: Asia/Shanghai
+
+# 写入寄存器前保留的小数位数（null 表示不处理）
+decimal_places: 2
+
 query: |
   SELECT
     calc_time,

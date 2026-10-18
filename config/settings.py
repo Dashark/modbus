@@ -2,6 +2,7 @@
 配置加载：从 YAML 读取协议、从站、日志配置，并提供 Python 默认值兜底。
 日志使用相对路径，由 logging.yaml 决定；请从项目根目录运行以落到 logs/。
 """
+import os
 import logging.config
 from pathlib import Path
 from types import SimpleNamespace

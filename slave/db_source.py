@@ -83,8 +83,8 @@ class DatabaseSource(DataSource):
         try:
             with self.pool.connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SET statement_timeout = %s",
-                                (int(D.query_timeout * 1000),))
+                    timeout_ms = int(D.query_timeout * 1000)
+                    cur.execute(f"SET statement_timeout = {timeout_ms}")
                     cur.execute(D.query, (D.pump_room_id,))
                     row = cur.fetchone()
                     if row is None:

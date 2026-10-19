@@ -75,7 +75,6 @@ diagnostic_columns:
   - v_out_total
 
 default_for_missing: invalid
-valid_calc_status: 1
 bool_to_u16: true
 
 consistency_check:

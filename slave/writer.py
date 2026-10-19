@@ -1,6 +1,7 @@
 """
-寄存器写入器：把生成的一轮数据编码并写入从站保持寄存器。
+寄存器写入器：把生成/数据库的一轮数据编码并写入从站保持寄存器。
 支持暂停开关（用于触发主站 stale 判断）。
+写入成功后打印全部点表字段。
 """
 import threading
 import time
@@ -10,7 +11,7 @@ from typing import Dict, Any
 from pymodbus.datastore import ModbusSlaveContext
 
 from config.settings import settings
-from core.codec import dict_to_regs
+from core.codec import dict_to_regs, format_data_for_log
 from core.logger import get_logger
 
 P = settings.protocol
@@ -24,9 +25,9 @@ class RegisterWriter:
         self.generator = generator
         self.counter = 0
         self.stats = {"writes": 0, "errors": 0}
-        self.pause_event = threading.Event()   # set 时暂停写入
+        self.pause_event = threading.Event()
 
-    # ---- 暂停 / 恢复（供外部或测试调用） ----
+    # ---- 暂停 / 恢复 ----
     def pause(self):
         self.pause_event.set()
         log.warning("写入已暂停")
@@ -53,6 +54,16 @@ class RegisterWriter:
             log.exception("未知写入异常: %s", e)
         return False
 
+    # ---- 日志：打印全部字段 ----
+    def _log_full_data(self, data: Dict[str, Any]):
+        # 一行汇总：writeCounter + 全部字段
+        log.info(
+            "第 %d 轮写入成功 | writeCounter=%d | %s",
+            self.stats["writes"],
+            data.get("writeCounter", -1),
+            format_data_for_log(data),
+        )
+
     # ---- 主循环 ----
     def run_forever(self):
         while True:
@@ -64,14 +75,5 @@ class RegisterWriter:
             self.counter = (self.counter + 1) & 0xFFFF
             data = self.generator.next_round(self.counter)
             if self.write_round(data):
-                log.info(
-                    "第 %d 轮写入成功 | 进水瞬时=%.2f | 泵站总瞬时=%.2f | "
-                    "低告警=%d 高告警=%d | 写计数=%d",
-                    self.stats["writes"],
-                    data["instantInFlow"],
-                    data["pumpStationInstantTotalFlow"],
-                    data["lowFlowAlarm"],
-                    data["highFlowAlarm"],
-                    data["writeCounter"],
-                )
+                self._log_full_data(data)
             time.sleep(S.WRITE_PERIOD)

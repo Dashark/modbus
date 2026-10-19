@@ -61,3 +61,38 @@ def regs_to_dict(regs: List[int]) -> Dict[str, Any]:
         else:
             out[name] = regs_to_float(regs[off], regs[off + 1])
     return out
+
+def format_data_for_log(data: dict, decimal_places: int = 2) -> str:
+    """
+    按点表偏移顺序把 data 格式化为单行字符串，用于日志。
+    - 浮点：保留 decimal_places 位，NaN -> 'nan'，Inf -> 'inf'/'-inf'
+    - U16：整数
+    - 缺失字段：'<missing>'
+    例：
+      instantInFlow=125.68 totalInFlow=123456.79 outInstantFlow_1=30.12 ...
+    """
+    import math
+    parts = []
+    for name, _off in sorted(P.OFFSET.items(), key=lambda kv: kv[1]):
+        if name not in data:
+            parts.append(f"{name}=<missing>")
+            continue
+        v = data[name]
+        if name in P.U16_FIELDS:
+            try:
+                parts.append(f"{name}={int(v)}")
+            except (TypeError, ValueError):
+                parts.append(f"{name}={v!r}")
+        else:
+            try:
+                fv = float(v)
+            except (TypeError, ValueError):
+                parts.append(f"{name}={v!r}")
+                continue
+            if math.isnan(fv):
+                parts.append(f"{name}=nan")
+            elif math.isinf(fv):
+                parts.append(f"{name}={'inf' if fv > 0 else '-inf'}")
+            else:
+                parts.append(f"{name}={fv:.{decimal_places}f}")
+    return " ".join(parts)

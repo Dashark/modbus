@@ -14,6 +14,59 @@ from core.exceptions import describe_exception
 
 P = settings.protocol
 
+from core.codec import format_data_for_log
+
+class TestFormatDataForLog(unittest.TestCase):
+    def _full_data(self):
+        d = {k: 1.2345 for k in P.OFFSET}
+        d["lowFlowAlarm"] = 0
+        d["highFlowAlarm"] = 1
+        d["writeCounter"] = 42
+        return d
+
+    def test_contains_all_fields(self):
+        s = format_data_for_log(self._full_data())
+        for name in P.OFFSET:
+            self.assertIn(f"{name}=", s, f"缺少字段 {name}")
+
+    def test_float_2_decimals(self):
+        s = format_data_for_log(self._full_data())
+        self.assertIn("instantInFlow=1.23", s)
+
+    def test_nan_display(self):
+        d = self._full_data()
+        d["instantInFlow"] = float("nan")
+        s = format_data_for_log(d)
+        self.assertIn("instantInFlow=nan", s)
+
+    def test_inf_display(self):
+        d = self._full_data()
+        d["instantInFlow"] = float("inf")
+        d["totalInFlow"] = float("-inf")
+        s = format_data_for_log(d)
+        self.assertIn("instantInFlow=inf", s)
+        self.assertIn("totalInFlow=-inf", s)
+
+    def test_u16_int(self):
+        s = format_data_for_log(self._full_data())
+        self.assertIn("lowFlowAlarm=0", s)
+        self.assertIn("highFlowAlarm=1", s)
+        self.assertIn("writeCounter=42", s)
+
+    def test_missing_field(self):
+        d = self._full_data()
+        del d["instantInFlow"]
+        s = format_data_for_log(d)
+        self.assertIn("instantInFlow=<missing>", s)
+
+    def test_order_by_offset(self):
+        s = format_data_for_log(self._full_data())
+        # instantInFlow 应在 totalInFlow 之前
+        self.assertLess(s.index("instantInFlow="), s.index("totalInFlow="))
+        # writeCounter 应在最后
+        self.assertGreater(s.index("writeCounter="),
+                           s.index("highFlowAlarm="))
+
 
 class TestFloatCodec(unittest.TestCase):
 

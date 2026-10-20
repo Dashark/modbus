@@ -21,6 +21,8 @@ stale_threshold_sec: 30
 valid_calc_status:
   - OK
   - DEGRADED
+  - STOPPED
+  - ERROR
 
 # calc_time 时区（数据库列存储的本地时区）
 calc_timezone: Asia/Shanghai
